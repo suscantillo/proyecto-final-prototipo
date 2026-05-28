@@ -11,16 +11,80 @@ import {
   Sigma,
 } from 'lucide-react'
 import {
+  ScatterChart,
+  Scatter,
   LineChart,
   Line,
-  ReferenceLine,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
+  Label,
 } from 'recharts'
+
+// ── d_reg regression model ──────────────────────────────────────────────────
+// Model: d_reg = a0 + a1·n + a2·ln(z) + a3·(n-k)   R²=0.856  (85 SageMath instances)
+const DREG_COEFFS = [-11.201955, 2.155797, 12.729298, -3.172464] as const
+
+function predictDreg(n: number, k: number, z: number): number {
+  return DREG_COEFFS[0] + DREG_COEFFS[1] * n + DREG_COEFFS[2] * Math.log(z) + DREG_COEFFS[3] * (n - k)
+}
+
+// 85 SageMath instances: [n, k, z, d_reg_observed]
+const DREG_INSTANCES: ReadonlyArray<[number, number, number, number]> = [
+  // n=4, k=1
+  [4,1,3,3],[4,1,3,3],[4,1,3,3],[4,1,3,3],[4,1,3,3],
+  [4,1,7,9],[4,1,7,8],[4,1,7,8],[4,1,7,9],[4,1,7,8],
+  // n=4, k=2
+  [4,2,3,5],[4,2,3,5],[4,2,3,5],[4,2,3,5],[4,2,3,5],
+  [4,2,7,19],[4,2,7,15],[4,2,7,14],[4,2,7,14],[4,2,7,14],
+  // n=4, k=3
+  [4,3,3,8],[4,3,3,8],[4,3,3,8],[4,3,3,8],[4,3,3,8],
+  [4,3,7,21],[4,3,7,22],[4,3,7,21],[4,3,7,22],[4,3,7,22],
+  // n=6, k=2
+  [6,2,3,4],[6,2,3,4],[6,2,3,4],[6,2,3,4],[6,2,3,4],
+  [6,2,7,12],[6,2,7,12],[6,2,7,12],[6,2,7,12],[6,2,7,12],
+  // n=6, k=3
+  [6,3,3,6],[6,3,3,6],[6,3,3,6],[6,3,3,6],[6,3,3,6],
+  [6,3,7,16],[6,3,7,16],[6,3,7,16],[6,3,7,16],[6,3,7,16],
+  // n=6, k=4
+  [6,4,3,8],[6,4,3,8],[6,4,3,8],[6,4,3,8],[6,4,3,8],
+  [6,4,7,26],[6,4,7,30],[6,4,7,26],[6,4,7,25],[6,4,7,26],
+  // n=8, k=2
+  [8,2,3,4],[8,2,3,4],[8,2,3,4],[8,2,3,4],[8,2,3,4],
+  [8,2,7,11],[8,2,7,12],[8,2,7,11],[8,2,7,13],[8,2,7,11],
+  // n=8, k=4
+  [8,4,3,7],[8,4,3,7],[8,4,3,7],[8,4,3,7],[8,4,3,7],
+  [8,4,7,17],[8,4,7,17],[8,4,7,17],[8,4,7,17],[8,4,7,17],
+  // n=8, k=6
+  [8,6,3,10],[8,6,3,11],[8,6,3,11],[8,6,3,11],[8,6,3,11],
+]
+
+type ScatterPoint = { x: number; y: number; n: number; k: number; z: number }
+
+function buildScatterData() {
+  const z3: ScatterPoint[] = []
+  const z7: ScatterPoint[] = []
+  for (const [n, k, z, obs] of DREG_INSTANCES) {
+    const pt: ScatterPoint = { x: parseFloat(predictDreg(n, k, z).toFixed(2)), y: obs, n, k, z }
+    if (z === 3) z3.push(pt)
+    else z7.push(pt)
+  }
+  const all = [...z3, ...z7]
+  const minVal = Math.floor(Math.min(...all.map((p) => Math.min(p.x, p.y))))
+  const maxVal = Math.ceil(Math.max(...all.map((p) => Math.max(p.x, p.y))))
+  const diagonal: ScatterPoint[] = [
+    { x: minVal, y: minVal, n: 0, k: 0, z: 0 },
+    { x: maxVal, y: maxVal, n: 0, k: 0, z: 0 },
+  ]
+  return { z3, z7, diagonal }
+}
+
+const SCATTER_DATA = buildScatterData()
+
+// ────────────────────────────────────────────────────────────────────────────
 
 interface ResultsDisplayProps {
   results: EstimationResult | null
@@ -38,23 +102,19 @@ function formatNumber(num: number | undefined | null): string {
 function prepareChartData(
   sternData: DataPoint[] | undefined,
   bjmmData: DataPoint[] | undefined,
-  sternGData: DataPoint[] | undefined,
   showStern: boolean,
   showBjmm: boolean,
-  showSternG: boolean,
 ) {
   const ellValues = new Set<number>()
-  if (showStern)  sternData?.forEach((p) => ellValues.add(p.ell))
-  if (showBjmm)   bjmmData?.forEach((p) => ellValues.add(p.ell))
-  if (showSternG) sternGData?.forEach((p) => ellValues.add(p.ell))
+  if (showStern) sternData?.forEach((p) => ellValues.add(p.ell))
+  if (showBjmm)  bjmmData?.forEach((p) => ellValues.add(p.ell))
 
   return Array.from(ellValues)
     .sort((a, b) => a - b)
     .map((ell) => {
       const point: Record<string, number> = { ell }
-      if (showStern)  { const f = sternData?.find((p) => p.ell === ell);  if (f) point['Stern']   = f.time }
-      if (showBjmm)   { const f = bjmmData?.find((p) => p.ell === ell);   if (f) point['BJMM']    = f.time }
-      if (showSternG) { const f = sternGData?.find((p) => p.ell === ell); if (f) point['Stern_G'] = f.time }
+      if (showStern) { const f = sternData?.find((p) => p.ell === ell); if (f) point['Stern'] = f.time }
+      if (showBjmm)  { const f = bjmmData?.find((p) => p.ell === ell);  if (f) point['BJMM']  = f.time }
       return point
     })
 }
@@ -170,6 +230,83 @@ function ResultCard({
   )
 }
 
+function DregScatterPlot() {
+  const { z3, z7, diagonal } = SCATTER_DATA
+
+  const customTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: ScatterPoint }> }) => {
+    if (!active || !payload?.length) return null
+    const d = payload[0].payload
+    if (d.n === 0) return null
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg">
+        <p className="font-semibold text-slate-700">n={d.n}, k={d.k}, z={d.z}</p>
+        <p className="text-slate-500">Predicted: {d.x.toFixed(1)}</p>
+        <p className="text-slate-500">Observed: {d.y}</p>
+        <p className="text-slate-400">Residual: {(d.y - d.x).toFixed(1)}</p>
+      </div>
+    )
+  }
+
+  return (
+    <Card className="rounded-lg border border-slate-200 bg-white shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base text-slate-950">
+          <BarChart3 className="size-4 text-slate-500" />
+          d_reg Regression — Observed vs. Predicted
+        </CardTitle>
+        <p className="text-sm text-slate-500">
+          85 SageMath instances · model: d_reg = a₀ + a₁n + a₂ln(z) + a₃(n−k) ·{' '}
+          <span className="font-semibold text-violet-700">R² = 0.856</span>
+        </p>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[360px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <ScatterChart margin={{ top: 12, right: 22, left: 0, bottom: 36 }}>
+              <CartesianGrid stroke="#e2e8f0" strokeDasharray="4 4" />
+              <XAxis
+                type="number"
+                dataKey="x"
+                name="Predicted d_reg"
+                tick={{ fill: '#64748b', fontSize: 12 }}
+                axisLine={{ stroke: '#cbd5e1' }}
+                tickLine={{ stroke: '#cbd5e1' }}
+                domain={['auto', 'auto']}
+              >
+                <Label value="Predicted d_reg (model)" offset={-20} position="insideBottom" fill="#64748b" fontSize={12} />
+              </XAxis>
+              <YAxis
+                type="number"
+                dataKey="y"
+                name="Observed d_reg"
+                tick={{ fill: '#64748b', fontSize: 12 }}
+                axisLine={{ stroke: '#cbd5e1' }}
+                tickLine={{ stroke: '#cbd5e1' }}
+                width={56}
+              >
+                <Label value="Observed d_reg (SageMath)" angle={-90} position="insideLeft" offset={10} fill="#64748b" fontSize={12} />
+              </YAxis>
+              <Tooltip content={customTooltip} cursor={{ strokeDasharray: '3 3' }} />
+              <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
+              {/* diagonal y=x: perfect-fit reference */}
+              <Scatter
+                name="y = x (perfect fit)"
+                data={diagonal}
+                fill="none"
+                line={{ stroke: '#94a3b8', strokeDasharray: '5 3', strokeWidth: 1.5 }}
+                shape={() => null}
+                legendType="plainline"
+              />
+              <Scatter name="z = 3" data={z3} fill="#0f766e" opacity={0.80} r={4} />
+              <Scatter name="z = 7" data={z7} fill="#7c3aed" opacity={0.80} r={4} />
+            </ScatterChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 export function ResultsDisplay({ results, isLoading, error, selectedAttacks }: ResultsDisplayProps) {
   if (isLoading) {
     return (
@@ -211,11 +348,10 @@ export function ResultsDisplay({ results, isLoading, error, selectedAttacks }: R
     )
   }
 
-  const showStern       = selectedAttacks.includes('stern')           && results.stern           != null
-  const showBjmm        = selectedAttacks.includes('bjmm')            && results.bjmm            != null
-  const showGroebner    = selectedAttacks.includes('groebner')        && results.groebner        != null
-  const showSternG      = selectedAttacks.includes('stern_g')         && results.stern_g         != null
-  const showCollision   = selectedAttacks.includes('collision_search') && results.collision_search != null
+  const showStern     = selectedAttacks.includes('stern')            && results.stern            != null
+  const showBjmm      = selectedAttacks.includes('bjmm')             && results.bjmm             != null
+  const showGroebner  = selectedAttacks.includes('groebner')         && results.groebner         != null
+  const showCollision = selectedAttacks.includes('collision_search') && results.collision_search != null
 
   const sternTime    = results.stern?.optimal?.time
   const sternMemory  = results.stern?.optimal?.memory
@@ -229,10 +365,6 @@ export function ResultsDisplay({ results, isLoading, error, selectedAttacks }: R
   const groebnerMemory = results.groebner?.optimal?.memory
   const groebnerDReg   = results.groebner?.optimal?.d_reg
 
-  const sternGTime   = results.stern_g?.optimal?.time
-  const sternGMemory = results.stern_g?.optimal?.memory
-  const sternGEll    = results.stern_g?.optimal?.ell
-
   const csTime   = results.collision_search?.optimal?.time
   const csMemory = results.collision_search?.optimal?.memory
   const csJa     = results.collision_search?.optimal?.ja
@@ -241,12 +373,10 @@ export function ResultsDisplay({ results, isLoading, error, selectedAttacks }: R
   const chartData = prepareChartData(
     results.stern?.data,
     results.bjmm?.data,
-    results.stern_g?.data,
     showStern,
     showBjmm,
-    showSternG,
   )
-  const showChart = chartData.length > 0 || showGroebner
+  const showLineChart = chartData.length > 0
 
   const anyResult = results.stern ?? results.bjmm ?? results.groebner ?? results.stern_g
   const displayN = anyResult && 'n' in anyResult ? (anyResult as { n: number }).n : '—'
@@ -256,8 +386,7 @@ export function ResultsDisplay({ results, isLoading, error, selectedAttacks }: R
   if (showStern    && sternTime    != null && sternMemory    != null) times.push({ label: 'Stern',    time: sternTime,    memory: sternMemory })
   if (showBjmm     && bjmmTime     != null && bjmmMemory     != null) times.push({ label: 'BJMM',     time: bjmmTime,     memory: bjmmMemory })
   if (showGroebner && groebnerTime != null && groebnerMemory != null) times.push({ label: 'Gröbner',  time: groebnerTime, memory: groebnerMemory })
-  if (showSternG    && sternGTime != null && sternGMemory != null) times.push({ label: 'Stern_G',             time: sternGTime, memory: sternGMemory })
-  if (showCollision && csTime    != null && csMemory    != null) times.push({ label: 'Submatrix Stern/Dumer', time: csTime,     memory: csMemory })
+  if (showCollision && csTime    != null && csMemory    != null) times.push({ label: 'Submatrix Stern/Dumer', time: csTime, memory: csMemory })
 
   const fastest = times.length > 0 ? times.reduce((a, b) => a.time   < b.time   ? a : b) : null
   const lowMem  = times.length > 0 ? times.reduce((a, b) => a.memory < b.memory ? a : b) : null
@@ -276,10 +405,9 @@ export function ResultsDisplay({ results, isLoading, error, selectedAttacks }: R
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        {showStern     && <ResultCard title="Stern Attack"                  time={sternTime}    memory={sternMemory}    ell={sternEll}      accent="teal"    />}
-        {showBjmm      && <ResultCard title="BJMM Attack"                   time={bjmmTime}     memory={bjmmMemory}     ell={bjmmEll}       accent="indigo"  />}
-        {showGroebner  && <ResultCard title="Gröbner Basis (F5)"            time={groebnerTime} memory={groebnerMemory} dReg={groebnerDReg} accent="violet"  />}
-        {showSternG    && <ResultCard title="Stern R-SDP(G)"                time={sternGTime}   memory={sternGMemory}   ell={sternGEll}     accent="orange"  />}
+        {showStern     && <ResultCard title="Stern Attack"       time={sternTime}    memory={sternMemory}    ell={sternEll}      accent="teal"    />}
+        {showBjmm      && <ResultCard title="BJMM Attack"        time={bjmmTime}     memory={bjmmMemory}     ell={bjmmEll}       accent="indigo"  />}
+        {showGroebner  && <ResultCard title="Gröbner Basis (F5)" time={groebnerTime} memory={groebnerMemory} dReg={groebnerDReg} accent="violet"  />}
         {showCollision && (
           <ResultCard
             title={`Submatrix Stern/Dumer${csJa != null ? ` (ja=${csJa}, jb=${csJb})` : ''}`}
@@ -290,7 +418,7 @@ export function ResultsDisplay({ results, isLoading, error, selectedAttacks }: R
         )}
       </div>
 
-      {showChart && (
+      {showLineChart && (
         <Card className="rounded-lg border border-slate-200 bg-white shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base text-slate-950">
@@ -299,7 +427,6 @@ export function ResultsDisplay({ results, isLoading, error, selectedAttacks }: R
             </CardTitle>
             <p className="text-sm text-slate-500">
               Lower values indicate better estimated attack complexity.
-              {showGroebner && groebnerTime != null && ' Dashed line: Gröbner (deterministic).'}
             </p>
           </CardHeader>
           <CardContent>
@@ -315,29 +442,11 @@ export function ResultsDisplay({ results, isLoading, error, selectedAttacks }: R
                     contentStyle={{ borderRadius: 8, borderColor: '#cbd5e1', boxShadow: '0 10px 30px rgba(15,23,42,0.10)' }}
                   />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  {showStern  && results.stern?.data  && results.stern.data.length  > 0 && (
-                    <Line type="monotone" dataKey="Stern"   stroke="#0f766e" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                  {showStern && results.stern?.data && results.stern.data.length > 0 && (
+                    <Line type="monotone" dataKey="Stern" stroke="#0f766e" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 2 }} activeDot={{ r: 6 }} />
                   )}
-                  {showBjmm   && results.bjmm?.data   && results.bjmm.data.length   > 0 && (
-                    <Line type="monotone" dataKey="BJMM"    stroke="#4f46e5" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 2 }} activeDot={{ r: 6 }} />
-                  )}
-                  {showSternG && results.stern_g?.data && results.stern_g.data.length > 0 && (
-                    <Line type="monotone" dataKey="Stern_G" stroke="#ea580c" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 2 }} activeDot={{ r: 6 }} />
-                  )}
-                  {showGroebner && groebnerTime != null && (
-                    <ReferenceLine
-                      y={groebnerTime}
-                      stroke="#7c3aed"
-                      strokeWidth={2}
-                      strokeDasharray="6 3"
-                      label={{
-                        value: `Gröbner: 2^${groebnerTime.toFixed(1)}`,
-                        position: 'insideTopRight',
-                        fill: '#7c3aed',
-                        fontSize: 11,
-                        fontWeight: 600,
-                      }}
-                    />
+                  {showBjmm && results.bjmm?.data && results.bjmm.data.length > 0 && (
+                    <Line type="monotone" dataKey="BJMM" stroke="#4f46e5" strokeWidth={2.5} dot={{ r: 3, strokeWidth: 2 }} activeDot={{ r: 6 }} />
                   )}
                 </LineChart>
               </ResponsiveContainer>
@@ -345,6 +454,8 @@ export function ResultsDisplay({ results, isLoading, error, selectedAttacks }: R
           </CardContent>
         </Card>
       )}
+
+      {showGroebner && <DregScatterPlot />}
 
       {times.length >= 2 && fastest && lowMem && (
         <Card className="rounded-lg border border-slate-200 bg-slate-950 text-white shadow-sm">

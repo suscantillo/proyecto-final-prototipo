@@ -1,5 +1,5 @@
 import { AttackType } from '../lib/types'
-import { Check, GitBranch, Network, FlaskConical, Layers, Zap } from 'lucide-react'
+import { Check, GitBranch, Network, FlaskConical, Zap } from 'lucide-react'
 
 interface AttackSelectorProps {
   selectedAttacks: AttackType[]
@@ -39,13 +39,6 @@ const ATTACKS_RSDP: AttackDef[] = [
 ]
 
 const ATTACKS_RSDPG: AttackDef[] = [
-  {
-    value: 'stern_g',
-    label: 'Stern R-SDP(G)',
-    description: 'Generic ISD on R-SDP(G) — ignores subgroup G structure',
-    icon: Layers,
-    accent: 'orange',
-  },
   {
     value: 'collision_search',
     label: 'Submatrix Stern/Dumer',
