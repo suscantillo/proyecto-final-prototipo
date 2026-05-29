@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { Activity, Binary, Braces, ShieldCheck } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Activity, Binary, BookOpen, Braces, ShieldCheck } from 'lucide-react'
 import { CrossParameters, EstimationResult, AttackType } from '../lib/types'
 import { estimateComplexity } from '../services/api'
 import { ParameterPanel } from './ParameterPanel'
 import { AttackSelector } from './AttackSelector'
 import { ResultsDisplay } from './ResultsDisplay'
+import { QuickExamples } from './QuickExamples'
 
 const DEFAULT_PARAMETERS:   CrossParameters = { n: 127, k: 76,  z: 7 }
 const DEFAULT_PARAMETERS_G: CrossParameters = { n: 55,  k: 36,  z: 127, m: 25, p: 509 }
@@ -27,16 +29,24 @@ export function EstimatorApp() {
     setSelectedAttacks(attacks)
   }
 
+  const handleLoadExample = (params: CrossParameters, attacks: AttackType[]) => {
+    const goingToG   = attacks.some((a) => RSDPG_ATTACKS.has(a))
+    const comingFromG = isRSDPG(selectedAttacks)
+    if (goingToG !== comingFromG) setResults(null)
+    setParameters(params)
+    setSelectedAttacks(attacks)
+  }
+
   const handleCalculate = async () => {
     if (selectedAttacks.length === 0) { setError('Please select at least one attack'); return }
     setIsLoading(true)
     setError(null)
     try {
       const result: EstimationResult = {}
-      if (selectedAttacks.includes('stern'))    result.stern    = await estimateComplexity.stern(parameters)
-      if (selectedAttacks.includes('bjmm'))     result.bjmm     = await estimateComplexity.bjmm(parameters)
-      if (selectedAttacks.includes('groebner')) result.groebner = await estimateComplexity.groebner(parameters)
-      if (selectedAttacks.includes('stern_g'))         result.stern_g         = await estimateComplexity.stern_g(parameters)
+      if (selectedAttacks.includes('stern'))            result.stern            = await estimateComplexity.stern(parameters)
+      if (selectedAttacks.includes('bjmm'))             result.bjmm             = await estimateComplexity.bjmm(parameters)
+      if (selectedAttacks.includes('groebner'))         result.groebner         = await estimateComplexity.groebner(parameters)
+      if (selectedAttacks.includes('stern_g'))          result.stern_g          = await estimateComplexity.stern_g(parameters)
       if (selectedAttacks.includes('collision_search')) result.collision_search = await estimateComplexity.collision_search(parameters)
       setResults(result)
     } catch (err) {
@@ -64,8 +74,18 @@ export function EstimatorApp() {
                 R-SDP Attack Complexity Estimator
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
-                Quantitative security analysis of attacks on the Restricted Syndrome Decoding problem, evaluated on CROSS parameters.
+                Quantitative security analysis of attacks on the Restricted Syndrome Decoding
+                problem, evaluated on CROSS parameters.
               </p>
+              <div className="mt-3">
+                <Link
+                  to="/informacion"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-medium text-teal-700 hover:bg-teal-100"
+                >
+                  <BookOpen className="size-3.5" />
+                  ¿No entiendes algo? Ir a /informacion
+                </Link>
+              </div>
             </div>
 
             <div className="grid grid-cols-3 gap-2 rounded-lg border border-slate-200 bg-white/75 p-2 shadow-sm shadow-slate-200/50 backdrop-blur">
@@ -73,7 +93,7 @@ export function EstimatorApp() {
                 <div className="flex items-center gap-1.5 text-xs text-slate-500">
                   <Binary className="size-3.5 text-teal-700" />Field
                 </div>
-                <p className="mt-1 text-sm font-semibold text-slate-900">F<sub>{parameters.n === 251 ? 509 : 127}</sub></p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">F<sub>{parameters.p ?? (parameters.z === 127 ? 509 : 127)}</sub></p>
               </div>
               <div className="min-w-0 rounded-md bg-slate-50 px-3 py-2">
                 <div className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -94,7 +114,16 @@ export function EstimatorApp() {
         <div className="grid flex-1 grid-cols-1 gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
           <aside className="space-y-5">
             <section className="rounded-lg border border-slate-200 bg-white/90 p-5 shadow-sm shadow-slate-200/60">
-              <ParameterPanel parameters={parameters} onParametersChange={setParameters} onCalculate={handleCalculate} isLoading={isLoading} selectedAttacks={selectedAttacks} />
+              <QuickExamples onLoad={handleLoadExample} />
+            </section>
+            <section className="rounded-lg border border-slate-200 bg-white/90 p-5 shadow-sm shadow-slate-200/60">
+              <ParameterPanel
+                parameters={parameters}
+                onParametersChange={setParameters}
+                onCalculate={handleCalculate}
+                isLoading={isLoading}
+                selectedAttacks={selectedAttacks}
+              />
             </section>
             <section className="rounded-lg border border-slate-200 bg-white/90 p-5 shadow-sm shadow-slate-200/60">
               <AttackSelector selectedAttacks={selectedAttacks} onAttackChange={handleAttackChange} />
@@ -102,7 +131,13 @@ export function EstimatorApp() {
           </aside>
 
           <main className="min-w-0 rounded-lg border border-slate-200 bg-white/90 p-5 shadow-sm shadow-slate-200/60 lg:p-6">
-            <ResultsDisplay results={results} isLoading={isLoading} error={error} selectedAttacks={selectedAttacks} />
+            <ResultsDisplay
+              results={results}
+              isLoading={isLoading}
+              error={error}
+              selectedAttacks={selectedAttacks}
+              parameters={parameters}
+            />
           </main>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { EstimationResult, AttackType, DataPoint } from '../lib/types'
+import { EstimationResult, AttackType, DataPoint, CrossParameters } from '../lib/types'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import {
   AlertCircle,
@@ -20,12 +20,14 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts'
+import { ResultInterpretation } from './ResultInterpretation'
 
 interface ResultsDisplayProps {
   results: EstimationResult | null
   isLoading: boolean
   error: string | null
   selectedAttacks: AttackType[]
+  parameters: CrossParameters
 }
 
 function formatNumber(num: number | undefined | null): string {
@@ -97,6 +99,9 @@ function ResultCard({
   ell,
   dReg,
   accent,
+  n,
+  k,
+  z,
 }: {
   title: string
   time: number | null | undefined
@@ -104,6 +109,9 @@ function ResultCard({
   ell?: number | null
   dReg?: number | null
   accent: AccentColor
+  n?: number
+  k?: number
+  z?: number
 }) {
   const borderClass: Record<AccentColor, string> = {
     teal:    'border-t-teal-600',
@@ -160,12 +168,15 @@ function ResultCard({
             <p className="font-mono text-lg font-semibold text-slate-950">d_reg = {dReg}</p>
           </div>
         )}
+        {n != null && k != null && z != null && (
+          <ResultInterpretation time={time} n={n} k={k} z={z} />
+        )}
       </CardContent>
     </Card>
   )
 }
 
-export function ResultsDisplay({ results, isLoading, error, selectedAttacks }: ResultsDisplayProps) {
+export function ResultsDisplay({ results, isLoading, error, selectedAttacks, parameters }: ResultsDisplayProps) {
   if (isLoading) {
     return (
       <div className="flex min-h-[420px] items-center justify-center">
@@ -229,7 +240,7 @@ export function ResultsDisplay({ results, isLoading, error, selectedAttacks }: R
   const csJb     = results.collision_search?.optimal?.jb
 
   const chartData = prepareChartData(results.stern?.data, results.bjmm?.data, showStern, showBjmm)
-  const showChart = chartData.length > 0
+  const showLineChart = chartData.length > 0
 
   const anyResult = results.stern ?? results.bjmm ?? results.groebner
   const displayN = anyResult && 'n' in anyResult ? (anyResult as { n: number }).n : '—'
@@ -258,20 +269,23 @@ export function ResultsDisplay({ results, isLoading, error, selectedAttacks }: R
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        {showStern    && <ResultCard title="Stern Attack"       time={sternTime}    memory={sternMemory}    ell={sternEll}      accent="teal"   />}
-        {showBjmm     && <ResultCard title="BJMM Attack"        time={bjmmTime}     memory={bjmmMemory}     ell={bjmmEll}       accent="indigo" />}
-        {showGroebner && <ResultCard title="Gröbner Basis (F5)" time={groebnerTime} memory={groebnerMemory} dReg={groebnerDReg} accent="violet" />}
+        {showStern    && <ResultCard title="Stern Attack"       time={sternTime}    memory={sternMemory}    ell={sternEll}      accent="teal"   n={parameters.n} k={parameters.k} z={parameters.z} />}
+        {showBjmm     && <ResultCard title="BJMM Attack"        time={bjmmTime}     memory={bjmmMemory}     ell={bjmmEll}       accent="indigo" n={parameters.n} k={parameters.k} z={parameters.z} />}
+        {showGroebner && <ResultCard title="Gröbner Basis (F5)" time={groebnerTime} memory={groebnerMemory} dReg={groebnerDReg} accent="violet" n={parameters.n} k={parameters.k} z={parameters.z} />}
         {showCollision && (
           <ResultCard
             title={`Submatrix Stern/Dumer${csJa != null ? ` (ja=${csJa}, jb=${csJb})` : ''}`}
             time={csTime}
             memory={csMemory}
             accent="emerald"
+            n={parameters.n}
+            k={parameters.k}
+            z={parameters.z}
           />
         )}
       </div>
 
-      {showChart && (
+      {showLineChart && (
         <Card className="rounded-lg border border-slate-200 bg-white shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base text-slate-950">
