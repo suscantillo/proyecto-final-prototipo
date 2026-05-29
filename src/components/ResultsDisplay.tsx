@@ -23,7 +23,6 @@ import {
   ResponsiveContainer,
   Label,
 } from 'recharts'
-import type { TooltipProps } from 'recharts'
 
 // ── d_reg regression model ──────────────────────────────────────────────────
 // Model: d_reg = a0 + a1·n + a2·ln(z) + a3·(n-k)   R²=0.856  (85 SageMath instances)
@@ -231,9 +230,9 @@ function ResultCard({
   )
 }
 
-function DregTooltip({ active, payload }: TooltipProps<number, string>) {
+function DregTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload?: ScatterPoint }> }) {
   if (!active || !payload?.length) return null
-  const d = payload[0]?.payload as ScatterPoint | undefined
+  const d = payload[0]?.payload
   if (!d || d.n === 0) return null
   return (
     <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg">
