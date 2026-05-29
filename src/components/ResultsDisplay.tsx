@@ -233,7 +233,7 @@ function ResultCard({
 function DregScatterPlot() {
   const { z3, z7, diagonal } = SCATTER_DATA
 
-  const customTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: ScatterPoint }> }) => {
+  const customTooltip = ({ active, payload }: { active?: boolean; payload?: ReadonlyArray<{ payload: ScatterPoint }> }) => {
     if (!active || !payload?.length) return null
     const d = payload[0].payload
     if (d.n === 0) return null
