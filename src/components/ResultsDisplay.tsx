@@ -23,6 +23,7 @@ import {
   ResponsiveContainer,
   Label,
 } from 'recharts'
+import type { TooltipProps } from 'recharts'
 
 // ── d_reg regression model ──────────────────────────────────────────────────
 // Model: d_reg = a0 + a1·n + a2·ln(z) + a3·(n-k)   R²=0.856  (85 SageMath instances)
@@ -230,22 +231,22 @@ function ResultCard({
   )
 }
 
+function DregTooltip({ active, payload }: TooltipProps<number, string>) {
+  if (!active || !payload?.length) return null
+  const d = payload[0]?.payload as ScatterPoint | undefined
+  if (!d || d.n === 0) return null
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg">
+      <p className="font-semibold text-slate-700">n={d.n}, k={d.k}, z={d.z}</p>
+      <p className="text-slate-500">Predicted: {d.x.toFixed(1)}</p>
+      <p className="text-slate-500">Observed: {d.y}</p>
+      <p className="text-slate-400">Residual: {(d.y - d.x).toFixed(1)}</p>
+    </div>
+  )
+}
+
 function DregScatterPlot() {
   const { z3, z7, diagonal } = SCATTER_DATA
-
-  const customTooltip = ({ active, payload }: { active?: boolean; payload?: ReadonlyArray<{ payload: ScatterPoint }> }) => {
-    if (!active || !payload?.length) return null
-    const d = payload[0].payload
-    if (d.n === 0) return null
-    return (
-      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg">
-        <p className="font-semibold text-slate-700">n={d.n}, k={d.k}, z={d.z}</p>
-        <p className="text-slate-500">Predicted: {d.x.toFixed(1)}</p>
-        <p className="text-slate-500">Observed: {d.y}</p>
-        <p className="text-slate-400">Residual: {(d.y - d.x).toFixed(1)}</p>
-      </div>
-    )
-  }
 
   return (
     <Card className="rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -286,7 +287,7 @@ function DregScatterPlot() {
               >
                 <Label value="Observed d_reg (SageMath)" angle={-90} position="insideLeft" offset={10} fill="#64748b" fontSize={12} />
               </YAxis>
-              <Tooltip content={customTooltip} cursor={{ strokeDasharray: '3 3' }} />
+              <Tooltip content={<DregTooltip />} cursor={{ strokeDasharray: '3 3' }} />
               <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
               {/* diagonal y=x: perfect-fit reference */}
               <Scatter
